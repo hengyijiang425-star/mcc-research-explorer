@@ -39,15 +39,15 @@ def search():
     if not q:
         return jsonify([])
 
-    # 直接从 publication 表里搜 title / abstract / authors
     results = query_db("""
         SELECT *
-        FROM publication
+        FROM pubmed_publication
         WHERE lower(title) LIKE ?
            OR lower(abstract) LIKE ?
            OR lower(authors) LIKE ?
-        ORDER BY pmid DESC
-    """, (f"%{q}%", f"%{q}%", f"%{q}%"))
+           OR lower(pi_name) LIKE ?
+        ORDER BY id DESC
+    """, (f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%"))
 
     return jsonify(results)
 
@@ -57,36 +57,28 @@ def search():
 # -------------------------------
 @app.route("/search_name")
 def search_name():
-    name = request.args.get("name", "")
+    name = request.args.get("name", "").strip().lower()
 
-    df = pd.read_excel(PI_EXCEL, sheet_name="Sheet2")
+    if not name:
+        return jsonify({"error": "No researcher name entered"})
 
-    # 🔥 模糊匹配名字
-    match = df[df["PI_NAMEs"].str.contains(name, case=False, na=False)]
+    rows = query_db("""
+        SELECT *
+        FROM pubmed_publication
+        WHERE lower(pi_name) LIKE ?
+        ORDER BY id DESC
+    """, (f"%{name}%",))
 
-    if match.empty:
+    if not rows:
         return jsonify({"error": "No researcher found"})
 
-    row = match.iloc[0]
-
     result = {
-        "name": row.get("PI_NAMEs"),
-        "orcid": row.get("ORCID"),
+        "name": rows[0].get("pi_name"),
+        "orcid": rows[0].get("orcid"),
+        "publications": rows
     }
 
-    # 🔥 如果没有 ORCID
-    if pd.isna(result["orcid"]):
-        result["publications"] = []
-        return jsonify(result)
-
-    # 🔥 从数据库查 publication（如果你有）
-    cached = query_db(
-        "SELECT * FROM publication WHERE orcid = ?", (result["orcid"],)
-    )
-
-    if cached:
-        result["publications"] = cached
-        return jsonify(result)
+    return jsonify(result)
 
     # 如果没有缓存（你以后可以接API）
     result["publications"] = []
