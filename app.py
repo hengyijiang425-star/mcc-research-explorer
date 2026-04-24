@@ -51,7 +51,6 @@ def search():
 
     return jsonify(results)
 
-
 # -------------------------------
 # 🔎 按名字查 + ORCID + publication
 # -------------------------------
@@ -75,6 +74,7 @@ def search_name():
     result = {
         "name": rows[0].get("pi_name"),
         "orcid": rows[0].get("orcid"),
+        "pi_id": rows[0].get("pi_id"),
         "publications": rows
     }
 

@@ -35,6 +35,7 @@ function renderNameResults(data) {
         <h2>Researcher Search Result</h2>
         <p><strong>Name:</strong> ${data.name || "N/A"}</p>
         <p><strong>ORCID:</strong> ${data.orcid || "N/A"}</p>
+        <p><strong>PI_ID:</strong> ${data.pi_id || "N/A"}</p>
     `;
 
     if (!data.publications || data.publications.length === 0) {

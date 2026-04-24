@@ -12,10 +12,13 @@ def init_pubmed_table():
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
 
+    cur.execute("DROP TABLE IF EXISTS pubmed_publication")
+
     cur.execute("""
         CREATE TABLE IF NOT EXISTS pubmed_publication (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             pi_name TEXT,
+            pi_id TEXT,
             orcid TEXT,
             pmid TEXT UNIQUE,
             title TEXT,
@@ -110,17 +113,18 @@ def fetch_pubmed_details(pmids):
     return articles
 
 
-def save_pubmed_articles(pi_name, orcid, articles):
+def save_pubmed_articles(pi_name, pi_id, orcid, articles):
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
 
     for a in articles:
         cur.execute("""
             INSERT OR IGNORE INTO pubmed_publication
-            (pi_name, orcid, pmid, title, authors, journal, pub_date, abstract, doi)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (pi_name, pi_id, orcid, pmid, title, authors, journal, pub_date, abstract, doi)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             pi_name,
+            pi_id,
             orcid,
             a["pmid"],
             a["title"],
@@ -140,31 +144,39 @@ def build_pubmed_table():
 
     df = pd.read_excel(PI_EXCEL, sheet_name="Sheet2")
 
-    # 你这里列名如果不一样，再改
+    print("Excel columns are:")
+    print(df.columns.tolist())
+
     for _, row in df.iterrows():
         pi_name = str(row.get("PI_NAMEs", "")).strip()
+        pi_id = str(row.get("PI_IDS", "")).strip()
         orcid = str(row.get("ORCID", "")).strip()
 
         if not pi_name or pi_name.lower() == "nan":
             continue
 
-        # 优先用 ORCID 搜，如果没有再用名字搜
-        if orcid and orcid.lower() != "nan":
+        if pi_id.lower() == "nan":
+            pi_id = ""
+        if orcid.lower() == "nan":
+            orcid = ""
+
+        if orcid:
             query = f'{orcid}[AUID]'
         else:
             query = f'"{pi_name}"[Author]'
 
-        print(f"Searching PubMed for: {pi_name} | query={query}")
+        print("DEBUG:", pi_name, pi_id, orcid)
+        print(f"Searching PubMed for: {pi_name} | PI_ID={pi_id} | query={query}")
 
         try:
             pmids = search_pubmed_pmids(query, retmax=20)
             articles = fetch_pubmed_details(pmids)
-            save_pubmed_articles(pi_name, orcid, articles)
+            save_pubmed_articles(pi_name, pi_id, orcid, articles)
             print(f"Saved {len(articles)} articles for {pi_name}")
         except Exception as e:
             print(f"Error for {pi_name}: {e}")
 
-        time.sleep(0.5)  # 避免请求太快
+        time.sleep(1.2)
 
 
 if __name__ == "__main__":
